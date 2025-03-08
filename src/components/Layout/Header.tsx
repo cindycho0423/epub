@@ -1,12 +1,5 @@
-import React from 'react';
+import { User } from '@/types';
 import styled from 'styled-components';
-
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  color: string;
-}
 
 interface HeaderProps {
   currentUser?: User | null;
@@ -44,7 +37,7 @@ const HeaderContainer = styled.header`
 `;
 
 const Title = styled.h1`
-  margin: 20px 0;
+  margin: 20px;
 `;
 
 const UserContainer = styled.div<{ bgColor: string }>`
