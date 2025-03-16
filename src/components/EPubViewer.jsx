@@ -1,7 +1,5 @@
-// src/components/EPubViewer.jsx
-
 import Epub from 'epubjs';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   saveHighlight,
   updateHighlight,
@@ -12,6 +10,10 @@ import {
   cancelShareHighlight,
 } from '../services/highlightService';
 import { USERS } from './UserSelector';
+// TocPanel 컴포넌트 import
+import TocPanel from './TocPanel';
+import SharedHighlightsList from './SharedHighlightsList';
+import MyHighlightsList from './MyHighlightsList';
 
 const EPubViewer = ({ url, bookId, currentUser }) => {
   // rendition 객체와 book 객체를 저장할 ref 생성
@@ -25,10 +27,9 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
   // 하이라이트 관련 상태 관리
   const [highlights, setHighlights] = useState([]);
   const [sharedHighlights, setSharedHighlights] = useState([]);
-  const [isHighlightMode, setIsHighlightMode] = useState(false);
+  const [isHighlightMode] = useState(true);
   const [selectedHighlight, setSelectedHighlight] = useState(null);
   const [memoText, setMemoText] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#ffff00'); // 기본 노란색
 
   // 목차 관련 상태 관리
   const [toc, setToc] = useState([]);
@@ -36,16 +37,7 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
 
   // 공유 상태 관리
   const [isShowingSharedHighlights, setIsShowingSharedHighlights] =
-    useState(true);
-
-  // 사용 가능한 하이라이트 색상 목록
-  const highlightColors = [
-    { id: 'yellow', color: '#ffff00', name: '노랑' },
-    { id: 'green', color: '#90ee90', name: '초록' },
-    { id: 'blue', color: '#add8e6', name: '파랑' },
-    { id: 'pink', color: '#ffb6c1', name: '분홍' },
-    { id: 'orange', color: '#ffa500', name: '주황' },
-  ];
+    useState(false);
 
   // 하이라이트 불러오기
   useEffect(() => {
@@ -137,11 +129,11 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
           const text = contents.window.getSelection().toString();
 
           if (text && text.trim() !== '') {
-            // 로컬 하이라이트 객체 생성
+            // 로컬 하이라이트 객체 생성 - 색상은 현재 사용자의 색상으로 설정
             const newHighlight = {
               text: text.trim(),
               cfi: cfiRange,
-              color: selectedColor,
+              color: currentUser.color,
               memo: '',
               createdAt: new Date().toISOString(),
             };
@@ -208,7 +200,7 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
       setError('EPUB 뷰어를 초기화하는 중 오류가 발생했습니다.');
       setIsLoading(false);
     }
-  }, [url, isHighlightMode, bookId, currentUser, selectedColor]);
+  }, [url, isHighlightMode, bookId, currentUser]);
 
   // 하이라이트를 화면에 적용하는 함수
   const applyHighlightToScreen = highlight => {
@@ -227,7 +219,7 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
         undefined,
         {
           fill: highlight.color,
-          'fill-opacity': '0.5',
+          'fill-opacity': '0.3',
         }
       );
     } catch (error) {
@@ -258,7 +250,7 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
         undefined,
         {
           fill: highlight.color,
-          'fill-opacity': '0.3', // 공유 하이라이트는 더 투명하게
+          'fill-opacity': '0.3',
           stroke: userColor,
           'stroke-width': '1px',
         }
@@ -277,12 +269,10 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
       applyHighlightToScreen(highlight);
     });
 
-    // 공유된 하이라이트 적용 (설정이 켜져 있을 때만)
-    if (isShowingSharedHighlights) {
-      sharedHighlights.forEach(highlight => {
-        applySharedHighlightToScreen(highlight);
-      });
-    }
+    // 공유된 하이라이트 적용
+    sharedHighlights.forEach(highlight => {
+      applySharedHighlightToScreen(highlight);
+    });
   };
 
   // 이전 페이지로 이동하는 함수
@@ -303,17 +293,11 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
     }
   };
 
-  // 하이라이트 모드 토글 함수
-  const toggleHighlightMode = () => {
-    setIsHighlightMode(!isHighlightMode);
-  };
-
   // 목차 표시 토글 함수
   const toggleToc = () => {
     setIsTocVisible(!isTocVisible);
   };
 
-  // 공유된 하이라이트 표시 토글 함수
   // 공유된 하이라이트 표시 토글 함수
   const toggleSharedHighlights = () => {
     const newState = !isShowingSharedHighlights;
@@ -368,16 +352,10 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
         console.error('목차 이동 오류:', error);
       });
 
-      // 모바일 환경에서는 목차 클릭 후 자동으로 목차를 닫기
       if (window.innerWidth < 768) {
         setIsTocVisible(false);
       }
     }
-  };
-
-  // 하이라이트 색상 변경 함수
-  const changeHighlightColor = color => {
-    setSelectedColor(color);
   };
 
   // 하이라이트 삭제 함수
@@ -439,39 +417,6 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
     setMemoText('');
   };
 
-  // 모든 하이라이트 삭제 함수
-  const clearAllHighlights = async () => {
-    if (!window.confirm('모든 하이라이트를 삭제하시겠습니까?')) {
-      return;
-    }
-
-    // 화면에서 모든 하이라이트 제거
-    if (renditionRef.current) {
-      renditionRef.current.annotations.clear();
-    }
-
-    // Firestore에서 모든 하이라이트 삭제
-    const deletePromises = highlights.map(h => deleteHighlight(h.id));
-
-    try {
-      await Promise.all(deletePromises);
-    } catch (error) {
-      console.error('하이라이트 일괄 삭제 오류:', error);
-    }
-
-    // 상태 초기화
-    setHighlights([]);
-    setSelectedHighlight(null);
-    setMemoText('');
-
-    // 공유 하이라이트는 다시 표시
-    if (isShowingSharedHighlights) {
-      sharedHighlights.forEach(highlight => {
-        applySharedHighlightToScreen(highlight);
-      });
-    }
-  };
-
   // 하이라이트 메모 변경 이벤트 핸들러
   const handleMemoChange = e => {
     setMemoText(e.target.value);
@@ -506,81 +451,15 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
     }
   };
 
-  // 목차 컴포넌트 - 재귀적으로 중첩된 목차를 표시
-  const TocItem = ({ item, level = 0 }) => (
-    <li style={{ marginLeft: `${level * 15}px` }}>
-      <div
-        onClick={() => handleTocItemClick(item.href)}
-        style={{
-          padding: '8px',
-          cursor: 'pointer',
-          borderBottom: '1px solid #eee',
-          display: 'flex',
-          alignItems: 'center',
-          fontSize: level === 0 ? '1em' : '0.9em',
-          backgroundColor: level === 0 ? '#f5f5f5' : 'transparent',
-        }}>
-        {item.label}
-      </div>
-      {item.subitems && item.subitems.length > 0 && (
-        <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-          {item.subitems.map((subitem, i) => (
-            <TocItem key={i} item={subitem} level={level + 1} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-
   return (
     <div style={{ display: 'flex', height: '100%', position: 'relative' }}>
-      {/* 목차 사이드바 */}
-      <div
-        style={{
-          width: isTocVisible ? '250px' : '0',
-          height: '100%',
-          backgroundColor: '#fff',
-          borderRight: '1px solid #ddd',
-          overflow: 'hidden',
-          transition: 'width 0.3s ease',
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 50,
-          boxShadow: isTocVisible ? '2px 0 5px rgba(0,0,0,0.1)' : 'none',
-        }}>
-        {isTocVisible && (
-          <div style={{ height: '100%', overflow: 'auto' }}>
-            <div
-              style={{
-                padding: '15px',
-                borderBottom: '1px solid #ddd',
-                fontWeight: 'bold',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-              <span>목차</span>
-              <button
-                onClick={toggleToc}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1.2em',
-                }}>
-                ×
-              </button>
-            </div>
-            <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-              {toc.map((item, i) => (
-                <TocItem key={i} item={item} />
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+      {/* 별도 컴포넌트로 분리한 목차 패널 */}
+      <TocPanel
+        toc={toc}
+        isTocVisible={isTocVisible}
+        toggleToc={toggleToc}
+        handleTocItemClick={handleTocItemClick}
+      />
 
       {/* 메인 콘텐츠 영역 */}
       <div
@@ -590,33 +469,6 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
           transition: 'margin-left 0.3s ease',
           width: '100%',
         }}>
-        {/* 현재 사용자 표시 */}
-        {currentUser && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              backgroundColor: currentUser.color + '20', // 투명도 추가
-              borderBottom: `2px solid ${currentUser.color}`,
-            }}>
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                marginRight: '10px',
-                border: `1px solid ${currentUser.color}`,
-              }}
-            />
-            <span style={{ fontWeight: 'bold' }}>
-              {currentUser.name}로 읽는 중
-            </span>
-          </div>
-        )}
-
         {/* 버튼 컨테이너 */}
         <div
           style={{
@@ -670,18 +522,6 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
             다음 페이지
           </button>
 
-          {/* 하이라이트 모드 토글 버튼 */}
-          <button
-            onClick={toggleHighlightMode}
-            disabled={isLoading || !!error || !currentUser}
-            style={{
-              margin: '5px',
-              padding: '5px 10px',
-              backgroundColor: isHighlightMode ? selectedColor : '#f0f0f0',
-            }}>
-            {isHighlightMode ? '하이라이트 모드 켜짐' : '하이라이트 모드'}
-          </button>
-
           {/* 공유 하이라이트 표시 토글 버튼 */}
           <button
             onClick={toggleSharedHighlights}
@@ -698,46 +538,7 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
               ? '공유 하이라이트 표시 중'
               : '공유 하이라이트 표시'}
           </button>
-
-          {/* 모든 하이라이트 삭제 버튼 */}
-          <button
-            onClick={clearAllHighlights}
-            disabled={isLoading || !!error || highlights.length === 0}
-            style={{ margin: '5px', padding: '5px 10px' }}>
-            하이라이트 모두 삭제
-          </button>
         </div>
-
-        {/* 하이라이트 모드가 켜져 있을 때만 색상 선택 UI 표시 */}
-        {isHighlightMode && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              marginBottom: '10px',
-            }}>
-            <div style={{ marginRight: '10px' }}>하이라이트 색상: </div>
-            {highlightColors.map(colorOption => (
-              <div
-                key={colorOption.id}
-                onClick={() => changeHighlightColor(colorOption.color)}
-                style={{
-                  width: '25px',
-                  height: '25px',
-                  backgroundColor: colorOption.color,
-                  margin: '0 5px',
-                  cursor: 'pointer',
-                  border:
-                    colorOption.color === selectedColor
-                      ? '2px solid black'
-                      : '1px solid #ddd',
-                  borderRadius: '4px',
-                }}
-                title={colorOption.name}
-              />
-            ))}
-          </div>
-        )}
 
         {/* EPUB 뷰어 컨테이너 */}
         <div
@@ -937,86 +738,20 @@ const EPubViewer = ({ url, bookId, currentUser }) => {
             </ul>
           </div>
         )}
-
-        {/* 공유된 하이라이트 목록 */}
-        {isShowingSharedHighlights && sharedHighlights.length > 0 && (
-          <div
-            style={{
-              marginTop: '20px',
-              border: '1px solid #ddd',
-              padding: '10px',
-              maxHeight: '300px',
-              overflowY: 'auto',
-            }}>
-            <h3>공유된 하이라이트 목록</h3>
-            <ul style={{ listStyleType: 'none', padding: '0' }}>
-              {sharedHighlights.map(highlight => {
-                // 해당 사용자 정보 찾기
-                const user = USERS.find(u => u.id === highlight.userId);
-
-                return (
-                  <li
-                    key={highlight.id}
-                    style={{
-                      padding: '8px',
-                      margin: '5px 0',
-                      backgroundColor: '#f9f9f9',
-                      borderRadius: '4px',
-                      borderLeft: `4px solid ${highlight.color}`,
-                      borderRight: user ? `4px solid ${user.color}` : 'none',
-                    }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 'bold' }}>
-                          {highlight.text}
-                        </div>
-                        {highlight.memo && (
-                          <div style={{ marginTop: '5px', fontSize: '0.9em' }}>
-                            <strong>메모:</strong> {highlight.memo}
-                          </div>
-                        )}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            fontSize: '0.8em',
-                            color: '#666',
-                            marginTop: '5px',
-                          }}>
-                          {user && (
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              style={{
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
-                                marginRight: '5px',
-                                border: `1px solid ${user.color}`,
-                              }}
-                            />
-                          )}
-                          <span
-                            style={{ color: user ? user.color : 'inherit' }}>
-                            {highlight.userName || '알 수 없는 사용자'}
-                          </span>
-                          <span style={{ margin: '0 5px' }}>•</span>
-                          <span>
-                            {new Date(highlight.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        {/* 하이라이트 목록 컴포넌트 */}
+        {/* <MyHighlightsList
+          highlights={highlights}
+          setSelectedHighlight={setSelectedHighlight}
+          setMemoText={setMemoText}
+          removeHighlight={removeHighlight}
+          bookId={bookId}
+          currentUser={currentUser}
+        /> */}
+        {/* 공유된 하이라이트 목록 컴포넌트 */}
+        <SharedHighlightsList
+          sharedHighlights={sharedHighlights}
+          users={USERS}
+        />
       </div>
     </div>
   );
